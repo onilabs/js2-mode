@@ -6015,47 +6015,6 @@ corresponding number.  Otherwise return -1."
         js2-ts-string nil)
   (js2-report-scan-error "msg.XML.bad.form" t))
 
-(defsubst js2-read-whole-cdata ()
-  "Read CDATA section from ! to ]]>"
-  (assert (eq (js2-peek-char) ?!))
-  (setq c (js2-get-char)) ;; skip !
-  (js2-add-to-string c)
-  (setq c (js2-peek-char))
-  (case c
-    (?-
-     (setq c (js2-get-char)) ;; skip -
-     (js2-add-to-string c)
-     (if (eq c ?-)
-         (progn
-           (js2-add-to-string c)
-           (unless (js2-read-xml-comment)
-             (throw 'return js2-ERROR)))
-       (js2-xml-discard-string)
-       (throw 'return js2-ERROR)))
-    (?\[
-     (setq c (js2-get-char)) ;; skip [
-     (js2-add-to-string c)
-     (if (and (= (js2-get-char) ?C)
-              (= (js2-get-char) ?D)
-              (= (js2-get-char) ?A)
-              (= (js2-get-char) ?T)
-              (= (js2-get-char) ?A)
-              (= (js2-get-char) ?\[))
-         (progn
-           (js2-add-to-string ?C)
-           (js2-add-to-string ?D)
-           (js2-add-to-string ?A)
-           (js2-add-to-string ?T)
-           (js2-add-to-string ?A)
-           (js2-add-to-string ?\[)
-           (unless (js2-read-cdata)
-             (throw 'return js2-ERROR)))
-       (js2-xml-discard-string)
-       (throw 'return js2-ERROR)))
-    (t
-     (unless (js2-read-entity)
-       (throw 'return js2-ERROR)))))
-
 (defun js2-get-next-xml-token ()
   (setq js2-ts-string-buffer nil  ; for recording the XML
         js2-token-beg js2-ts-cursor)
@@ -6108,12 +6067,43 @@ corresponding number.  Otherwise return -1."
                    (setq c (js2-peek-char))
                    (case c
                      (?!
-                      ;; read CDATA section
-                      (js2-read-whole-cdata)
-                      (when (zerop js2-ts-xml-open-tags-count)
-                        ;; allow bare CDATA section
-                        ;; ex) let xml = <![CDATA[ foo bar baz ]]>;
-                        (throw 'return js2-XMLEND)))
+                      (setq c (js2-get-char)) ;; skip !
+                      (js2-add-to-string c)
+                      (setq c (js2-peek-char))
+                      (case c
+                        (?-
+                         (setq c (js2-get-char)) ;; skip -
+                         (js2-add-to-string c)
+                         (if (eq c ?-)
+                             (progn
+                               (js2-add-to-string c)
+                               (unless (js2-read-xml-comment)
+                                 (throw 'return js2-ERROR)))
+                           (js2-xml-discard-string)
+                           (throw 'return js2-ERROR)))
+                        (?\[
+                         (setq c (js2-get-char)) ;; skip [
+                         (js2-add-to-string c)
+                         (if (and (= (js2-get-char) ?C)
+                                  (= (js2-get-char) ?D)
+                                  (= (js2-get-char) ?A)
+                                  (= (js2-get-char) ?T)
+                                  (= (js2-get-char) ?A)
+                                  (= (js2-get-char) ?\[))
+                             (progn
+                               (js2-add-to-string ?C)
+                               (js2-add-to-string ?D)
+                               (js2-add-to-string ?A)
+                               (js2-add-to-string ?T)
+                               (js2-add-to-string ?A)
+                               (js2-add-to-string ?\[)
+                               (unless (js2-read-cdata)
+                                 (throw 'return js2-ERROR)))
+                           (js2-xml-discard-string)
+                           (throw 'return js2-ERROR)))
+                        (t
+                         (unless (js2-read-entity)
+                           (throw 'return js2-ERROR)))))
                      (??
                       (setq c (js2-get-char)) ;; skip ?
                       (js2-add-to-string c)
