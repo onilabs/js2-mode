@@ -4867,6 +4867,7 @@ You should use `js2-print-tree' instead of this function."
                       js2-SETVAR
                       js2-SET_REF
                       js2-SET_REF_OP
+                      js2-SPAWN ; StratifiedJS
                       js2-SWITCH
                       js2-TARGET
                       js2-THROW
