@@ -680,7 +680,9 @@ which doesn't seem particularly useful, but Rhino permits it."
 (defvar js2-COMMENT 160)
 (defvar js2-ENUM 161)  ; for "enum" reserved word
 
-(defconst js2-num-tokens (1+ js2-ENUM))
+(defvar js2-RETRACT 162) ; StratifiedJS
+
+(defconst js2-num-tokens (1+ js2-RETRACT))
 
 (defconst js2-debug-print-trees nil)
 
@@ -1712,8 +1714,8 @@ the correct number of ARGS must be provided."
 (js2-msg "msg.no.brace.catchblock"
          "missing '{' before catch-block body")
 
-(js2-msg "msg.try.no.catchfinally"
-         "'try' without 'catch' or 'finally'")
+(js2-msg "msg.try.no.catchretractfinally" ; StratifiedJS
+         "'try' without 'catch', 'retract' or 'finally'")
 
 (js2-msg "msg.no.return.value"
          "function %s does not always return a value")
@@ -2674,10 +2676,12 @@ NAME can be a lisp symbol or string.  SYMBOL is a `js2-symbol'."
                                                   len
                                                   try-block
                                                   catch-clauses
+                                                  retract-block ; StratifiedJS
                                                   finally-block)))
   "AST node for a try-statement."
   try-block
   catch-clauses  ; a lisp list of `js2-catch-node'
+  retract-block  ; StratifiedJS
   finally-block) ; a `js2-finally-node'
 
 (put 'cl-struct-js2-try-node 'js2-visitor 'js2-visit-try-node)
@@ -2687,11 +2691,13 @@ NAME can be a lisp symbol or string.  SYMBOL is a `js2-symbol'."
   (js2-visit-ast (js2-try-node-try-block n) v)
   (dolist (clause (js2-try-node-catch-clauses n))
     (js2-visit-ast clause v))
+  (js2-visit-ast (js2-try-node-retract-block n) v) ; StratifiedJS
   (js2-visit-ast (js2-try-node-finally-block n) v))
 
 (defun js2-print-try-node (n i)
   (let ((pad (js2-make-pad i))
         (catches (js2-try-node-catch-clauses n))
+        (retract (js2-try-node-retract-block n)) ; StratifiedJS
         (finally (js2-try-node-finally-block n)))
     (insert pad "try {\n")
     (js2-print-body (js2-try-node-try-block n) (1+ i))
@@ -2699,6 +2705,8 @@ NAME can be a lisp symbol or string.  SYMBOL is a `js2-symbol'."
     (when catches
       (dolist (catch catches)
         (js2-print-ast catch i)))
+    (if retract
+        (js2-print-ast retract i)) ; StratifiedJS
     (if finally
         (js2-print-ast finally i)
       (insert "\n"))))
@@ -2765,6 +2773,29 @@ NAME can be a lisp symbol or string.  SYMBOL is a `js2-symbol'."
   (let ((pad (js2-make-pad i)))
     (insert " finally {\n")
     (js2-print-body (js2-finally-node-body n) (1+ i))
+    (insert pad "}\n")))
+
+;; StratifiedJS retract node
+(defstruct (js2-retract-node
+            (:include js2-node)
+            (:constructor nil)
+            (:constructor make-js2-retract-node (&key (type js2-RETRACT)
+                                                      (pos js2-ts-cursor)
+                                                      len
+                                                      body)))
+  "AST node for a StratifiedJS retract clause."
+  body)
+
+(put 'cl-struct-js2-retract-node 'js2-visitor 'js2-visit-retract-node)
+(put 'cl-struct-js2-retract-node 'js2-printer 'js2-print-retract-node)
+
+(defun js2-visit-retract-node (n v)
+  (js2-visit-ast (js2-retract-node-body n) v))
+
+(defun js2-print-retract-node (n i)
+  (let ((pad (js2-make-pad i)))
+    (insert " retract {\n")
+    (js2-print-body (js2-retract-node-body n) (1+ i))
     (insert pad "}\n")))
 
 (defstruct (js2-switch-node
@@ -4793,6 +4824,7 @@ You should use `js2-print-tree' instead of this function."
                       js2-NEW
                       js2-REF_CALL
                       js2-RETHROW
+                      js2-RETRACT ; StratifiedJS
                       js2-RETURN
                       js2-RETURN_RESULT
                       js2-SEMI
@@ -5408,12 +5440,14 @@ into temp buffers."
     if in instanceof import
     let
     new null
+    retract ; StratifiedJS
     return
     switch
     this throw true try typeof
     var void
     while with
-    yield))
+    yield
+    ))
 
 ;; Token names aren't exactly the same as the keywords, unfortunately.
 ;; E.g. enum isn't in the tokens, and delete is js2-DELPROP.
@@ -5428,6 +5462,7 @@ into temp buffers."
                js2-IF js2-IN js2-INSTANCEOF js2-IMPORT
                js2-LET
                js2-NEW js2-NULL
+               js2-RETRACT ; StratifiedJS
                js2-RETURN
                js2-SWITCH
                js2-THIS js2-THROW js2-TRUE js2-TRY js2-TYPEOF
@@ -8010,7 +8045,8 @@ Parses for, for-in, and for each-in statements."
         try-end
         try-block
         catch-blocks
-        finally-block
+        finally-block ; StratifiedJS
+        retract-block
         saw-default-catch
         peek
         param
@@ -8019,6 +8055,7 @@ Parses for, for-in, and for each-in statements."
         guard-kwd
         catch-pos
         finally-pos
+        retract-pos ; StratifiedJS
         pn
         block
         lp
@@ -8079,11 +8116,23 @@ Parses for, for-in, and for each-in statements."
               (js2-node-len catch-node) (- try-end catch-pos))
         (js2-node-add-children catch-node param catch-cond block)
         (push catch-node catch-blocks)))
-     ((/= peek js2-FINALLY)
-      (js2-must-match js2-FINALLY "msg.try.no.catchfinally"
+     ((and (/= peek js2-FINALLY)
+           (/= peek js2-RETRACT)) ; StratifiedJS
+      (js2-must-match js2-FINALLY "msg.try.no.catchretractfinally"
                       (js2-node-pos try-block)
                       (- (setq try-end (js2-node-end try-block))
                          (js2-node-pos try-block)))))
+
+    ;; StratifiedJS retract block:
+    (when (js2-match-token js2-RETRACT)
+      (setq retract-pos js2-token-beg
+            block (js2-parse-statement)
+            try-end (js2-node-end block)
+            retract-block (make-js2-retract-node :pos retract-pos
+                                                 :len (- try-end retract-pos)
+                                                 :body block))
+      (js2-node-add-children retract-block block))
+
     (when (js2-match-token js2-FINALLY)
       (setq finally-pos js2-token-beg
             block (js2-parse-statement)
@@ -8095,8 +8144,9 @@ Parses for, for-in, and for each-in statements."
     (setq pn (make-js2-try-node :pos try-pos
                                 :len (- try-end try-pos)
                                 :try-block try-block
+                                :retract-block retract-block ; StratifiedJS
                                 :finally-block finally-block))
-    (js2-node-add-children pn try-block finally-block)
+    (js2-node-add-children pn try-block finally-block retract-block) ;; StratifiedJS
     ;; push them onto the try-node, which reverses and corrects their order
     (dolist (cb catch-blocks)
       (js2-node-add-children pn cb)
