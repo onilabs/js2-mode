@@ -697,8 +697,9 @@ which doesn't seem particularly useful, but Rhino permits it."
 (defvar js2-ENUM 161)  ; for "enum" reserved word
 
 (defvar js2-RETRACT 162) ; StratifiedJS
+(defvar js2-SPAWN 163) ; StratifiedJS
 
-(defconst js2-num-tokens (1+ js2-RETRACT))
+(defconst js2-num-tokens (1+ js2-SPAWN))
 
 (defconst js2-debug-print-trees nil)
 
@@ -3282,6 +3283,7 @@ The type field inherited from `js2-node' holds the operator."
                (cons js2-TYPEOF "typeof")
                (cons js2-INSTANCEOF "instanceof")
                (cons js2-DELPROP "delete")
+               (cons js2-SPAWN "spawn") ; StratifiedJS
                (cons js2-COMMA ",")
                (cons js2-COLON ":")
                (cons js2-OR "||")
@@ -3364,7 +3366,7 @@ The type field holds the actual assignment operator.")
                                                     operand)))
   "AST node type for unary operator nodes.
 The type field can be NOT, BITNOT, POS, NEG, INC, DEC,
-TYPEOF, or DELPROP.  For INC or DEC, a 'postfix node
+TYPEOF, DELPROP, or SPAWN. For INC or DEC, a 'postfix node
 property is added if the operator follows the operand."
   operand)  ; a `js2-node' expression
 
@@ -3384,6 +3386,7 @@ property is added if the operator follows the operand."
     (unless postfix
       (insert op))
     (if (or (= tt js2-TYPEOF)
+            (= tt js2-SPAWN) ; StratifiedJS
             (= tt js2-DELPROP))
         (insert " "))
     (js2-print-ast (js2-unary-node-operand n) 0)
@@ -5470,6 +5473,7 @@ into temp buffers."
     new null
     retract ; StratifiedJS
     return
+    spawn ; StratifiedJS
     switch
     this throw true try typeof
     var void
@@ -5492,7 +5496,8 @@ into temp buffers."
                js2-NEW js2-NULL
                js2-RETRACT ; StratifiedJS
                js2-RETURN
-               js2-SWITCH
+               js2-SPAWN
+               js2-SWITCH ; StratifiedJS
                js2-THIS js2-THROW js2-TRUE js2-TRY js2-TYPEOF
                js2-VAR
                js2-WHILE js2-WITH
@@ -8955,6 +8960,7 @@ to parse the operand (for prefix operators)."
      ((or (= tt js2-VOID)
           (= tt js2-NOT)
           (= tt js2-BITNOT)
+          (= tt js2-SPAWN) ; StratifiedJS
           (= tt js2-TYPEOF))
       (js2-consume-token)
       (js2-make-unary tt 'js2-parse-unary-expr))
