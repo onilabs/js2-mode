@@ -170,6 +170,22 @@ Set `js2-include-rhino-externs' to t to include them.")
   "Google Gears externs.
 Set `js2-include-gears-externs' to t to include them.")
 
+;; NodeJS:
+(defvar js2-nodejs-externs
+  (mapcar 'symbol-name
+          '(require process console))
+  "Node.JS externs.
+You can cause these to be included or excluded with the custom
+variable `js2-include-nodejs-externs'.")
+
+;; Apollo:
+(defvar js2-apollo-externs
+  (mapcar 'symbol-name
+          '(require hold))
+  "Oni Labs' Apollo externs.
+You can cause these to be included or excluded with the custom
+variable `js2-include-apollo-externs'.")
+
 ;;; Variables
 
 (defun js2-mark-safe-local (name pred)
@@ -878,6 +894,18 @@ See `js2-additional-externs' for more information about externs."
 
 (defcustom js2-include-gears-externs t
   "Non-nil to include Google Gears externs in the master externs list.
+See `js2-additional-externs' for more information about externs."
+  :type 'boolean
+  :group 'js2-mode)
+
+(defcustom js2-include-nodejs-externs t
+  "Non-nil to include Node.JS externs in the master externs list.
+See `js2-additional-externs' for more information about externs."
+  :type 'boolean
+  :group 'js2-mode)
+
+(defcustom js2-include-apollo-externs t
+  "Non-nil to include Oni Labs' Apollo externs in the master externs list.
 See `js2-additional-externs' for more information about externs."
   :type 'boolean
   :group 'js2-mode)
@@ -10512,6 +10540,10 @@ If so, we don't ever want to use bounce-indent."
                     js2-browser-externs)
                 (if js2-include-gears-externs
                     js2-gears-externs)
+                (if js2-include-nodejs-externs
+                    js2-nodejs-externs)
+                (if js2-include-apollo-externs
+                    js2-apollo-externs)
                 (if js2-include-rhino-externs
                      js2-rhino-externs)))
 
